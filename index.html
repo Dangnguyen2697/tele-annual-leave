@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="vi">
+ 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký nghỉ phép</title>
+    <style>
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            background: #f4f7f9;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            margin-top: 50px;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #007bff;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:active {
+            transform: scale(0.99);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #dc3545;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #f87171;
+        }
+
+        .success {
+            background: #d1fae5;
+            color: #0f766e;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #34d399;
+        }
+
+        .loading {
+            text-align: center;
+            color: #007bff;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>Đăng ký nghỉ phép</h2>
+
+        <div id="msg"></div>
+
+        <form id="leaveForm">
+            <label for="name">Họ và Tên</label>
+            <input type="text" id="name" name="name" required>
+         
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+
+
+            <label for="type">Loại nghỉ phép</label>
+            <select id="type" name="type" required>
+                <option value="">-- Chọn loại nghỉ --</option>
+                <option value="Nghỉ phép năm">Nghỉ phép năm</option>
+                <option value="Work from home">Work from home</option>
+                <option value="Nghỉ không lương">Nghỉ không lương</option>
+            </select>
+
+            <label for="leaveDate">Ngày bắt đầu nghỉ</label>
+            <input type="date" id="leaveDate" name="leaveDate" required>
+
+            <label for="days">Số ngày nghỉ </label>
+            <input type="number" id="days" name="days" min="0.5" step="0.5" placeholder="1, 3.5, 7" required>
+
+            <label for="session">Buổi nghỉ</label>
+            <select id="session" name="session" required>
+                <option value="All day">All day</option>
+                <option value="AM">AM (Buổi sáng)</option>
+                <option value="PM">PM (Buổi chiều)</option>
+            </select>
+
+            <label for="reason">Lý do</label>
+            <textarea id="reason" name="reason" rows="4" required></textarea>
+
+            <label for="handover">Người bàn giao công việc</label>
+            <input type="text" id="handover" name="handover">
+
+            <button type="submit" id="submitBtn">Gửi đăng ký</button>
+        </form>
+    </div>
+
+    <script>
+        // Vui lòng thay thế placeholder này bằng Webhook URL thực tế từ n8n của bạn
+        const N8N_WEBHOOK_URL = 'https://n8n.novatria.cloud/webhook-test/53951bb4-9c65-4d7a-bb5e-1700e35b5d35';
+        function formatDateDDMMYYYY(dateStr) {
+        const [yyyy, mm, dd] = dateStr.split("-");
+        return `${dd}-${mm}-${yyyy}`;
+}
+
+        document.getElementById("leaveForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
+            const msg = document.getElementById("msg");
+            const submitBtn = document.getElementById("submitBtn");
+
+            // Xóa thông báo cũ
+            msg.innerHTML = "";
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Đang xử lý...';
+
+            const leaveDateStr = document.getElementById("leaveDate").value;
+            const leaveDate = new Date(leaveDateStr);
+            const days = Number(document.getElementById("days").value);
+
+            // Lấy ngày hiện tại (chỉ lấy phần ngày, không tính giờ)
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            // Lấy ngày bắt đầu nghỉ (chỉ lấy phần ngày, không tính giờ)
+            leaveDate.setHours(0, 0, 0, 0);
+
+            // Tính khoảng cách giữa ngày bắt đầu nghỉ và ngày hiện tại (tính bằng mili giây)
+            const diffTime = leaveDate.getTime() - now.getTime();
+
+            // Chuyển đổi thành số ngày (làm tròn lên để đảm bảo tính thời gian chờ)
+            // Ví dụ: 24 tiếng 1 phút vẫn tính là 1 ngày, cần 72 tiếng mới là 3 ngày
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            // --- Bắt đầu Logic Kiểm tra Quy tắc (Client-side Validation) ---
+            let errorMessage = '';
+         
+            if ( leaveDate < Date.now()){
+               errorMessage='Ngày nghỉ phải ở tương lai';
+            }
+            // Quy tắc 1: Nghỉ > 3 ngày phải xin trước 30 ngày (diffDays >= 30)
+            else if (days > 3 && diffDays < 30) {
+                errorMessage = 'Nếu số ngày nghỉ lớn hơn 3, bạn phải nộp đơn trước ngày nghỉ tối thiểu 30 ngày.';
+            }
+            // Quy tắc 2: Nghỉ <= 3 ngày phải xin trước 3 ngày (diffDays >= 3)
+            else if (days <= 3 && diffDays < 3) {
+                errorMessage = 'Nếu số ngày nghỉ nhỏ hơn hoặc bằng 3, bạn phải nộp đơn trước ngày nghỉ tối thiểu 3 ngày.';
+            }
+
+            if (errorMessage) {
+                msg.innerHTML = `<div class="error">${errorMessage}</div>`;
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Gửi đăng ký';
+                return;
+            }
+            // --- Kết thúc Logic Kiểm tra Quy tắc ---
+
+            // Thu thập dữ liệu Form
+            const formData = {
+                name: document.getElementById("name").value,
+                type: document.getElementById("type").value,
+                leaveDate: formatDateDDMMYYYY(leaveDateStr), // Gửi dưới dạng chuỗi YYYY-MM-DD
+                days: days,
+                session: document.getElementById("session").value,
+                reason: document.getElementById("reason").value,
+                handover: document.getElementById("handover").value,
+                email: document.getElementById("email").value,
+                submissionTime: new Date().toISOString()// Đã thu thập thời gian gửi đơn
+            };
+
+            // Ghi log dữ liệu ra console để kiểm tra (tùy chọn)
+            console.log('Dữ liệu gửi đến n8n (bao gồm submissionTime):', formData);
+
+            // Gửi dữ liệu tới n8n Webhook
+            try {
+                // Hiển thị trạng thái đang tải (Loading)
+                msg.innerHTML = '<div class="loading">Đang gửi yêu cầu...</div>';
+
+                const response = await fetch(N8N_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                // Xử lý phản hồi từ n8n
+                if (response.ok) {
+                    msg.innerHTML = '<div class="success">✅ Đăng ký đã được gửi thành công! Quản lý sẽ xem xét và phản hồi sớm nhất.</div>';
+                    document.getElementById("leaveForm").reset(); // Xóa form sau khi gửi thành công
+                } else {
+                    // Lỗi từ phía n8n hoặc server
+                    msg.innerHTML = '<div class="error">❌ Lỗi: Không thể gửi yêu cầu đến hệ thống tự động hóa. Vui lòng thử lại. (Mã lỗi: ' + response.status + ')</div>';
+                }
+
+            } catch (error) {
+                // Lỗi mạng hoặc Fetch thất bại
+                console.error('Lỗi khi gửi dữ liệu:', error);
+                msg.innerHTML = '<div class="error">❌ Lỗi kết nối: Vui lòng kiểm tra kết nối mạng và Webhook URL.</div>';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Gửi đăng ký';
+            }
+        });
+    </script>
+
+</body>
+
+</html>
+
+
+
+
+
+
+
+
